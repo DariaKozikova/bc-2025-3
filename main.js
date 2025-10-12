@@ -1,73 +1,61 @@
 const { program } = require('commander');
 const fs = require('fs');
-const path = require('path');
 
 program
-  .option('-i, --input <file>', 'Path to input JSON file')
-  .option('-o, --output <file>', 'Path to output file')
-  .option('-d, --display', 'Display result in console')
-  .option('-h, --humidity', 'Show humidity (Humidity3pm)')
-  .option('-r, --rainfall <number>', 'Show only records with rainfall greater than given value', parseFloat);
+  .option('-i, --input <path>', 'Path to the input JSON file')
+  .option('-o, --output <path>', 'Path to the output file')
+  .option('-d, --display', 'Display result in the console')
+  .option('-h, --humidity', 'Display humidity in the afternoon')
+  .option('-r, --rainfall <value>', 'Filter by rainfall amount (show records with more than specified)');
 
-program.parse(process.argv);
+program.parse();
+
 const options = program.opts();
 
 if (!options.input) {
-  console.error("Please, specify input file");
+  console.error('Please, specify input file');
   process.exit(1);
 }
 
 if (!fs.existsSync(options.input)) {
-  console.error("Cannot find input file");
+  console.error('Cannot find input file');
   process.exit(1);
 }
 
-let data;
-try {
-  const raw = fs.readFileSync(options.input, 'utf-8');
-  if (!raw.trim()) {
-    console.error("Input file is empty");
-    process.exit(1);
-  }
-  data = JSON.parse(raw);
-} catch (err) {
-  console.error("Error reading or parsing input file");
-  process.exit(1);
+const fileContent = fs.readFileSync(options.input, 'utf-8');
+const data = JSON.parse(fileContent);
+let processedData = data;
+
+if (options.rainfall) {
+  const minRainfall = parseFloat(options.rainfall);
+  processedData = processedData.filter(
+    record => typeof record.Rainfall === 'number' && record.Rainfall > minRainfall
+  );
 }
 
-if (!Array.isArray(data)) {
-  console.error("Input JSON should be an array of records");
-  process.exit(1);
-}
-
-const outputLines = [];
-
-data.forEach((record) => {
-  if (options.rainfall !== undefined && (record.Rainfall === undefined || record.Rainfall <= options.rainfall)) {
-    return;
-  }
-
-  const parts = [];
-  parts.push(record.Rainfall ?? 0);
-  parts.push(record.Pressure3pm ?? 0);
+const resultLines = processedData.map(record => {
+  const parts = [
+    record.Rainfall,
+    record.Pressure3pm
+  ];
 
   if (options.humidity) {
-    parts.push(record.Humidity3pm ?? 0);
+    parts.push(record.Humidity3pm);
   }
 
-  outputLines.push(parts.join(' '));
+  return parts.join(' ');
 });
 
-const output = outputLines.join('\n');
+const outputString = resultLines.join('\n');
 
-if (options.display) {
-  console.log(output);
+if (!options.output && !options.display) {
+  process.exit(0);
 }
 
 if (options.output) {
-  try {
-    fs.writeFileSync(path.resolve(options.output), output, 'utf-8');
-  } catch {
-    console.error("Error writing to output file");
-  }
+  fs.writeFileSync(options.output, outputString);
+}
+
+if (options.display) {
+  console.log(outputString);
 }
