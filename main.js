@@ -48,10 +48,6 @@ const resultLines = processedData.map(record => {
 
 const outputString = resultLines.join('\n');
 
-if (!options.output && !options.display) {
-  process.exit(0);
-}
-
 if (options.output) {
   fs.writeFileSync(options.output, outputString);
 }
